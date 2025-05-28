@@ -200,8 +200,9 @@
   <script>
     let videoList = [];
     let currentVideoIndex = 0;
-    let heartCounts = {};
-    let commentCounts = {};
+    let heartCounts = JSON.parse(localStorage.getItem('heartCounts')) || {};
+    let commentCounts = JSON.parse(localStorage.getItem('commentCounts')) || {};
+    let hasHearted = JSON.parse(localStorage.getItem('hasHearted')) || {};
     const videoPlayer = document.getElementById("videoPlayer");
     const videoTitle = document.getElementById("videoTitle");
     const loading = document.getElementById("loading");
@@ -212,6 +213,7 @@
     const speedButtons = document.querySelectorAll(".controls button:not(:nth-child(1)):not(:nth-child(2)):not(:nth-child(3))");
 
     function parseCSV(csvText) {
+      console.log('Parsing CSV...');
       const lines = csvText.trim().split('\n');
       const headers = lines[0].split(',').map(header => header.trim());
       const urlIndex = headers.indexOf('url');
@@ -226,32 +228,46 @@
           });
         }
       }
+      console.log('Parsed videoList:', result);
       return result;
     }
 
     function saveVideoIndex(index) {
+      console.log('Saving video index:', index);
       localStorage.setItem('lastVideoIndex', index);
     }
 
     function getLastVideoIndex() {
       const savedIndex = localStorage.getItem('lastVideoIndex');
+      console.log('Getting last video index:', savedIndex);
       return savedIndex !== null ? parseInt(savedIndex) : 0;
     }
 
     function savePlaybackSpeed(speed) {
+      console.log('Saving playback speed:', speed);
       localStorage.setItem('playbackSpeed', speed);
     }
 
     function getSavedPlaybackSpeed() {
       const savedSpeed = localStorage.getItem('playbackSpeed');
+      console.log('Getting saved playback speed:', savedSpeed);
       return savedSpeed !== null ? parseFloat(savedSpeed) : 1;
     }
 
+    function saveCounts() {
+      console.log('Saving counts:', { heartCounts, commentCounts, hasHearted });
+      localStorage.setItem('heartCounts', JSON.stringify(heartCounts));
+      localStorage.setItem('commentCounts', JSON.stringify(commentCounts));
+      localStorage.setItem('hasHearted', JSON.stringify(hasHearted));
+    }
+
     function toggleControls() {
+      console.log('Toggling controls');
       controls.classList.toggle('show');
     }
 
     function setPlaybackSpeed(speed) {
+      console.log('Setting playback speed to:', speed);
       if (videoPlayer.playbackRate === speed) {
         videoPlayer.playbackRate = 1;
         savePlaybackSpeed(1);
@@ -269,45 +285,68 @@
     }
 
     function skipForward() {
+      console.log('Skipping forward by 10s');
       videoPlayer.currentTime += 10;
     }
 
     function toggleHeart() {
+      console.log('Toggling heart for index:', currentVideoIndex);
+      if (!videoList[currentVideoIndex] || !videoList[currentVideoIndex].url) {
+        console.error('Invalid video or URL at index:', currentVideoIndex);
+        return;
+      }
       const currentUrl = videoList[currentVideoIndex].url;
       heartCounts[currentUrl] = (heartCounts[currentUrl] || 0) + 1;
+      hasHearted[currentUrl] = true;
       heartButton.classList.add('active');
       sendToGoogleSheet(currentUrl, heartCounts[currentUrl], commentCounts[currentUrl] || 0);
+      saveCounts();
       updateStats(currentUrl);
     }
 
     function openCommentBox() {
+      console.log('Opening comment box for index:', currentVideoIndex);
+      if (!videoList[currentVideoIndex] || !videoList[currentVideoIndex].url) {
+        console.error('Invalid video or URL at index:', currentVideoIndex);
+        return;
+      }
       const comment = prompt("Nhập bình luận của bạn:");
       if (comment) {
         const currentUrl = videoList[currentVideoIndex].url;
         commentCounts[currentUrl] = (commentCounts[currentUrl] || 0) + 1;
         sendToGoogleSheet(currentUrl, heartCounts[currentUrl] || 0, commentCounts[currentUrl], comment);
+        saveCounts();
         updateStats(currentUrl);
       }
     }
 
     function sendToGoogleSheet(url, hearts, comments, commentText = "") {
+      console.log('Sending to Google Sheet:', { url, hearts, comments, commentText });
       const data = {
         url: url,
         hearts: hearts,
         comments: comments,
         commentText: commentText
       };
-      fetch('https://script.google.com/macros/s/AKfycbzjie9ZwclRQj9j9do-ntSJr6P8J8X1ZCYJjQ3BIoZWB7dNY_8QW7t-EYfv4RxC-TAUUw/exec', {
+      fetch('https://script.google.com/macros/s/AKfycbyBHCnkqCOh2HiLQWBG5bf7pyumBHFMD8r8A4JIhBp025Eai3XJ4q7Bikhfsf9G1NFWig/exec', {
         method: 'POST',
         body: JSON.stringify(data),
         headers: {
           'Content-Type': 'application/json'
         }
       })
-      .then(response => response.json())
+      .then(response => {
+        console.log('Response received:', response);
+        return response.json();
+      })
       .then(result => {
-        console.log('Data sent to Google Sheet:', result);
-        fetchStats(); // Cập nhật lại số liệu sau khi gửi
+        console.log('Result from Google Sheet:', result);
+        if (result.status === 'success') {
+          console.log('Data sent successfully');
+          fetchStats();
+        } else {
+          console.error('Error from Google Sheet:', result.message);
+        }
       })
       .catch(error => {
         console.error('Error sending data to Google Sheet:', error);
@@ -315,70 +354,106 @@
     }
 
     function fetchStats() {
-      fetch('https://script.google.com/macros/s/AKfycbz8Qz8gX9y5z9o9s7zq8z9y5z9o9s7zq8z9y5z9o9s7zq8z9y5z9o9s7zq8z9y5z9o9s7/exec')
-        .then(response => response.json())
+      console.log('Fetching stats for index:', currentVideoIndex);
+      if (!videoList[currentVideoIndex] || !videoList[currentVideoIndex].url) {
+        console.error('Invalid video or URL at index:', currentVideoIndex);
+        return;
+      }
+      fetch('https://script.google.com/macros/s/AKfycbyBHCnkqCOh2HiLQWBG5bf7pyumBHFMD8r8A4JIhBp025Eai3XJ4q7Bikhfsf9G1NFWig/exec')
+        .then(response => {
+          console.log('Fetch response:', response);
+          if (!response.ok) throw new Error('Network response was not ok');
+          return response.json();
+        })
         .then(data => {
-          console.log('Fetched stats:', data);
+          console.log('Fetched stats data:', data);
+          if (Array.isArray(data)) {
+            data.forEach(item => {
+              heartCounts[item.url] = item.hearts;
+              commentCounts[item.url] = item.comments;
+            });
+            saveCounts();
+          }
           updateStats(videoList[currentVideoIndex].url, data);
         })
         .catch(error => {
           console.error('Error fetching stats:', error);
+          updateStats(videoList[currentVideoIndex].url); // Hiển thị cục bộ nếu lỗi
         });
     }
 
     function updateStats(currentUrl, data = []) {
-      const videoData = data.find(item => item.url === currentUrl) || {hearts: heartCounts[currentUrl] || 0, comments: commentCounts[currentUrl] || 0, commentText: ""};
+      console.log('Updating stats for URL:', currentUrl);
+      if (!currentUrl) {
+        console.error('No current URL to update stats');
+        return;
+      }
+      const videoData = data.find(item => item.url === currentUrl) || {
+        hearts: heartCounts[currentUrl] || 0,
+        comments: commentCounts[currentUrl] || 0,
+        commentText: ""
+      };
       stats.textContent = `❤️ ${videoData.hearts} | 💬 ${videoData.comments}`;
       commentsList.innerHTML = videoData.commentText ? videoData.commentText.split('\n').map(c => `<p>${c}</p>`).join('') : '<p>Chưa có bình luận</p>';
+      if (videoList[currentVideoIndex] && videoList[currentVideoIndex].url === currentUrl) {
+        heartButton.classList.toggle('active', hasHearted[currentUrl]);
+      }
     }
 
     function playVideo(index) {
-      if (index >= 0 && index < videoList.length) {
-        videoPlayer.src = videoList[index].url;
-        videoPlayer.currentTime = 0;
-        videoTitle.textContent = videoList[index].title;
-        currentVideoIndex = index;
-        saveVideoIndex(index);
-        videoPlayer.playbackRate = 1;
-        savePlaybackSpeed(1);
-        speedButtons.forEach(button => button.classList.remove('active'));
-        heartButton.classList.remove('active');
-        fetchStats(); // Lấy số liệu khi chuyển video
-        const playPromise = videoPlayer.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.error('Autoplay failed:', error);
-            loading.textContent = 'Vui lòng nhấn vào video để phát';
-          });
-        }
+      console.log('Playing video at index:', index);
+      if (!videoList.length || index < 0 || index >= videoList.length) {
+        console.error('Invalid index or empty video list:', { index, videoListLength: videoList.length });
+        return;
+      }
+      videoPlayer.src = videoList[index].url;
+      videoPlayer.currentTime = 0;
+      videoTitle.textContent = videoList[index].title;
+      currentVideoIndex = index;
+      saveVideoIndex(index);
+      videoPlayer.playbackRate = 1;
+      savePlaybackSpeed(1);
+      speedButtons.forEach(button => button.classList.remove('active'));
+      fetchStats(); // Lấy số liệu cho video mới
+      const playPromise = videoPlayer.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.error('Autoplay failed:', error);
+          loading.textContent = 'Vui lòng nhấn vào video để phát';
+        });
       }
     }
 
     fetch('https://dl.dropboxusercontent.com/scl/fi/jrsp4wt51ldr118yhjkn8/data3.txt?rlkey=60ecaxtax6u07hploelllf8vi&st=uartdnkz&dl=0')
       .then(response => {
+        console.log('Fetch CSV response:', response);
         if (!response.ok) throw new Error('Failed to load CSV');
         return response.text();
       })
       .then(data => {
+        console.log('CSV data received:', data.substring(0, 100) + '...'); // Log first 100 chars
         videoList = parseCSV(data);
-        console.log('Video List:', videoList);
+        console.log('Video List after parsing:', videoList);
         loading.style.display = 'none';
         if (videoList.length > 0) {
           currentVideoIndex = getLastVideoIndex();
           if (currentVideoIndex >= videoList.length) {
             currentVideoIndex = 0;
+            console.log('Adjusted index to 0 due to out of bounds');
           }
           playVideo(currentVideoIndex);
         } else {
+          console.error('No videos found in videoList');
           loading.textContent = 'Không tìm thấy video trong danh sách';
         }
       })
       .catch(error => {
-        console.error('Lỗi tải CSV:', error);
+        console.error('Error loading CSV:', error);
         loading.textContent = 'Lỗi tải danh sách video';
       });
 
     function nextVideo() {
+      console.log('Next video, current index:', currentVideoIndex);
       if (currentVideoIndex < videoList.length - 1) {
         playVideo(currentVideoIndex + 1);
       } else {
@@ -387,20 +462,24 @@
     }
 
     function prevVideo() {
+      console.log('Previous video, current index:', currentVideoIndex);
       if (currentVideoIndex > 0) {
         playVideo(currentVideoIndex - 1);
       }
     }
 
     videoPlayer.addEventListener('ended', () => {
+      console.log('Video ended, playing next');
       nextVideo();
     });
 
     let touchStartY = 0;
     window.addEventListener('touchstart', (e) => {
+      console.log('Touch start at:', e.touches[0].clientY);
       touchStartY = e.touches[0].clientY;
     });
     window.addEventListener('touchend', (e) => {
+      console.log('Touch end at:', e.changedTouches[0].clientY);
       const touchEndY = e.changedTouches[0].clientY;
       if (touchStartY - touchEndY > 50) {
         nextVideo();
@@ -408,6 +487,10 @@
         prevVideo();
       }
     });
+
+    // Lấy số liệu khi tải trang
+    console.log('Fetching stats on page load');
+    fetchStats();
   </script>
 </body>
 </html>
