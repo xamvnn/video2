@@ -328,7 +328,7 @@
         comments: comments,
         commentText: commentText
       };
-      fetch('https://script.google.com/macros/s/AKfycbx-wuOOTem_lM3FUi5HHzH1fF556eyXsHTcdK6qb0cjRryitZyJwLZ1EK9az0EZlzP3/exec', {
+      fetch('https://script.google.com/macros/s/AKfycbyARY0ppHi-p7GECnHcW_VhnXhKEHRoUgn0Z2IK9RqPtUJzeIRxGVT5BoSUqsmvQEdomg/exec', {
         method: 'POST',
         body: JSON.stringify(data),
         headers: {
@@ -359,7 +359,7 @@
         console.error('Invalid video or URL at index:', currentVideoIndex);
         return;
       }
-      fetch('https://script.google.com/macros/s/AKfycbx-wuOOTem_lM3FUi5HHzH1fF556eyXsHTcdK6qb0cjRryitZyJwLZ1EK9az0EZlzP3/exec')
+      fetch('https://script.google.com/macros/s/AKfycbyARY0ppHi-p7GECnHcW_VhnXhKEHRoUgn0Z2IK9RqPtUJzeIRxGVT5BoSUqsmvQEdomg/exec')
         .then(response => {
           console.log('Fetch response:', response);
           if (!response.ok) throw new Error('Network response was not ok');
