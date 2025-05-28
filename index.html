@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Video Player</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #000;
+        font-family: Arial, sans-serif
+      }
+      .video-container {
+        position: relative;
+        width: 100vw;
+        height: 86vh;
+        display: flex;
+        justify-content: center;
+        align-items: center
+      }
+      video {
+        width: 98%;
+        max-height: 85vh;
+        object-fit: contain
+      }
+      .video-title {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        color: #fff;
+        font-size: 18px;
+        font-weight: 700;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, .7);
+        max-width: 80%;
+        word-wrap: break-word;
+        z-index: 5
+      }
+      .subscribe-text {
+        position: absolute;
+        top: 50px;
+        left: 20px;
+        color: #fff;
+        font-size: 16px;
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, .7);
+        z-index: 5
+      }
+      .subscribe-text a {
+        color: #ff0000;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .subscribe-text a:hover {
+        text-decoration: underline;
+      }
+      .control-toggle {
+        position: absolute;
+        top: 80px;
+        left: 20px;
+        background: rgba(0, 0, 0, .5);
+        border: none;
+        color: #fff;
+        padding: 8px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 18px;
+        z-index: 5
+      }
+      .control-toggle:hover {
+        background: rgba(0, 0, 0, .8);
+      }
+      .controls {
+        position: absolute;
+        top: 50%;
+        left: 20px;
+        transform: translateY(-50%);
+        display: none;
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+        z-index: 5
+      }
+      .controls.show {
+        display: flex;
+      }
+      .controls button {
+        background: rgba(0, 0, 0, .5);
+        border: none;
+        color: #fff;
+        padding: 8px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        opacity: 0.3
+      }
+      .controls button:hover {
+        background: rgba(0, 0, 0, .8);
+        opacity: 0.8
+      }
+      .controls button.active {
+        background: rgba(255, 255, 255, .3);
+        opacity: 0.8
+      }
+      .controls .skip-button {
+        font-size: 18px;
+        padding: 35px 20px;
+        border-radius: 12px
+      }
+      .heart-button, .comment-button {
+        position: absolute;
+        right: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: rgba(0, 0, 0, .5);
+        border: none;
+        color: #fff;
+        padding: 12px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 24px;
+        z-index: 5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .heart-button:hover, .comment-button:hover {
+        background: rgba(0, 0, 0, .8);
+      }
+      .heart-button.active {
+        color: #ff0000;
+      }
+      .comment-button {
+        top: calc(50% + 60px);
+      }
+      .loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #fff;
+        font-size: 24px;
+        z-index: 10
+      }
+    </style>
+</head>
+<body>
+  <div class="video-container">
+    <video id="videoPlayer" controls autoplay muted>
+      <source src="" type="video/mp4">Your browser does not support the video tag.
+    </video>
+    <div class="video-title" id="videoTitle"></div>
+    <div class="subscribe-text">
+      tml xin ủng hộ 1 sub nhé: <a href="https://www.youtube.com/@coilong864?sub_confirmation=1" target="_blank">Kênh YouTube</a>
+    </div>
+    <button class="control-toggle" onclick="toggleControls()">Tua</button>
+    <div class="controls" id="controls">
+      <button onclick="prevVideo()">Previous</button>
+      <button onclick="nextVideo()">Next</button>
+      <button class="skip-button" onclick="skipForward()">+10s</button>
+      <button onclick="setPlaybackSpeed(1.5)">x1.5</button>
+      <button onclick="setPlaybackSpeed(2)">x2</button>
+      <button onclick="setPlaybackSpeed(3)">x3</button>
+      <button onclick="setPlaybackSpeed(4)">x4</button>
+      <button onclick="setPlaybackSpeed(6)">x6</button>
+      <button onclick="setPlaybackSpeed(8)">x8</button>
+    </div>
+    <button class="heart-button" onclick="toggleHeart()">❤️</button>
+    <button class="comment-button" onclick="openCommentBox()">💬</button>
+    <div class="loading" id="loading">Đang tải...</div>
+  </div>
+  <script>
+    let videoList = [];
+    let currentVideoIndex = 0;
+    let heartCounts = {};
+    let commentCounts = {};
+    const videoPlayer = document.getElementById("videoPlayer");
+    const videoTitle = document.getElementById("videoTitle");
+    const loading = document.getElementById("loading");
+    const controls = document.getElementById("controls");
+    const heartButton = document.querySelector(".heart-button");
+    const speedButtons = document.querySelectorAll(".controls button:not(:nth-child(1)):not(:nth-child(2)):not(:nth-child(3))");
+
+    function parseCSV(csvText) {
+      const lines = csvText.trim().split('\n');
+      const headers = lines[0].split(',').map(header => header.trim());
+      const urlIndex = headers.indexOf('url');
+      const titleIndex = headers.indexOf('title');
+      const result = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(col => col.trim());
+        if (cols[urlIndex] && cols[titleIndex]) {
+          result.push({
+            url: cols[urlIndex],
+            title: cols[titleIndex]
+          });
+        }
+      }
+      return result;
+    }
+
+    function saveVideoIndex(index) {
+      localStorage.setItem('lastVideoIndex', index);
+    }
+
+    function getLastVideoIndex() {
+      const savedIndex = localStorage.getItem('lastVideoIndex');
+      return savedIndex !== null ? parseInt(savedIndex) : 0;
+    }
+
+    function savePlaybackSpeed(speed) {
+      localStorage.setItem('playbackSpeed', speed);
+    }
+
+    function getSavedPlaybackSpeed() {
+      const savedSpeed = localStorage.getItem('playbackSpeed');
+      return savedSpeed !== null ? parseFloat(savedSpeed) : 1;
+    }
+
+    function toggleControls() {
+      controls.classList.toggle('show');
+    }
+
+    function setPlaybackSpeed(speed) {
+      if (videoPlayer.playbackRate === speed) {
+        videoPlayer.playbackRate = 1;
+        savePlaybackSpeed(1);
+        speedButtons.forEach(button => button.classList.remove('active'));
+      } else {
+        videoPlayer.playbackRate = speed;
+        savePlaybackSpeed(speed);
+        speedButtons.forEach(button => {
+          button.classList.remove('active');
+          if (button.textContent === `x${speed}`) {
+            button.classList.add('active');
+          }
+        });
+      }
+    }
+
+    function skipForward() {
+      videoPlayer.currentTime += 10;
+    }
+
+    function toggleHeart() {
+      const currentUrl = videoList[currentVideoIndex].url;
+      heartCounts[currentUrl] = (heartCounts[currentUrl] || 0) + 1;
+      heartButton.classList.add('active');
+      sendToGoogleSheet(currentUrl, heartCounts[currentUrl], commentCounts[currentUrl] || 0);
+    }
+
+    function openCommentBox() {
+      const comment = prompt("Nhập bình luận của bạn:");
+      if (comment) {
+        const currentUrl = videoList[currentVideoIndex].url;
+        commentCounts[currentUrl] = (commentCounts[currentUrl] || 0) + 1;
+        sendToGoogleSheet(currentUrl, heartCounts[currentUrl] || 0, commentCounts[currentUrl]);
+      }
+    }
+
+    function sendToGoogleSheet(url, hearts, comments) {
+      const data = {
+        url: url,
+        hearts: hearts,
+        comments: comments
+      };
+      fetch('https://script.google.com/macros/s/AKfycbz8Qz8gX9y5z9o9s7zq8z9y5z9o9s7zq8z9y5z9o9s7zq8z9y5z9o9s7zq8z9y5z9o9s7/exec', {
+        method: 'POST',
+        body: JSON.stringify(data),
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      .then(response => response.json())
+      .then(result => {
+        console.log('Data sent to Google Sheet:', result);
+      })
+      .catch(error => {
+        console.error('Error sending data to Google Sheet:', error);
+      });
+    }
+
+    function playVideo(index) {
+      if (index >= 0 && index < videoList.length) {
+        videoPlayer.src = videoList[index].url;
+        videoPlayer.currentTime = 0;
+        videoTitle.textContent = videoList[index].title;
+        currentVideoIndex = index;
+        saveVideoIndex(index);
+        videoPlayer.playbackRate = 1;
+        savePlaybackSpeed(1);
+        speedButtons.forEach(button => button.classList.remove('active'));
+        heartButton.classList.remove('active');
+        const playPromise = videoPlayer.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error('Autoplay failed:', error);
+            loading.textContent = 'Vui lòng nhấn vào video để phát';
+          });
+        }
+      }
+    }
+
+    fetch('https://dl.dropboxusercontent.com/scl/fi/jrsp4wt51ldr118yhjkn8/data3.txt?rlkey=60ecaxtax6u07hploelllf8vi&st=uartdnkz&dl=0')
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to load CSV');
+        return response.text();
+      })
+      .then(data => {
+        videoList = parseCSV(data);
+        console.log('Video List:', videoList);
+        loading.style.display = 'none';
+        if (videoList.length > 0) {
+          currentVideoIndex = getLastVideoIndex();
+          if (currentVideoIndex >= videoList.length) {
+            currentVideoIndex = 0;
+          }
+          playVideo(currentVideoIndex);
+        } else {
+          loading.textContent = 'Không tìm thấy video trong danh sách';
+        }
+      })
+      .catch(error => {
+        console.error('Lỗi tải CSV:', error);
+        loading.textContent = 'Lỗi tải danh sách video';
+      });
+
+    function nextVideo() {
+      if (currentVideoIndex < videoList.length - 1) {
+        playVideo(currentVideoIndex + 1);
+      } else {
+        playVideo(0);
+      }
+    }
+
+    function prevVideo() {
+      if (currentVideoIndex > 0) {
+        playVideo(currentVideoIndex - 1);
+      }
+    }
+
+    videoPlayer.addEventListener('ended', () => {
+      nextVideo();
+    });
+
+    let touchStartY = 0;
+    window.addEventListener('touchstart', (e) => {
+      touchStartY = e.touches[0].clientY;
+    });
+    window.addEventListener('touchend', (e) => {
+      const touchEndY = e.changedTouches[0].clientY;
+      if (touchStartY - touchEndY > 50) {
+        nextVideo();
+      } else if (touchEndY - touchStartY > 50) {
+        prevVideo();
+      }
+    });
+  </script>
+</body>
+</html>
