@@ -328,7 +328,7 @@
         comments: comments,
         commentText: commentText
       };
-      fetch('https://script.google.com/macros/s/AKfycbyBHCnkqCOh2HiLQWBG5bf7pyumBHFMD8r8A4JIhBp025Eai3XJ4q7Bikhfsf9G1NFWig/exec', {
+      fetch('https://script.google.com/macros/s/AKfycbx-wuOOTem_lM3FUi5HHzH1fF556eyXsHTcdK6qb0cjRryitZyJwLZ1EK9az0EZlzP3/exec', {
         method: 'POST',
         body: JSON.stringify(data),
         headers: {
@@ -359,7 +359,7 @@
         console.error('Invalid video or URL at index:', currentVideoIndex);
         return;
       }
-      fetch('https://script.google.com/macros/s/AKfycbyBHCnkqCOh2HiLQWBG5bf7pyumBHFMD8r8A4JIhBp025Eai3XJ4q7Bikhfsf9G1NFWig/exec')
+      fetch('https://script.google.com/macros/s/AKfycbx-wuOOTem_lM3FUi5HHzH1fF556eyXsHTcdK6qb0cjRryitZyJwLZ1EK9az0EZlzP3/exec')
         .then(response => {
           console.log('Fetch response:', response);
           if (!response.ok) throw new Error('Network response was not ok');
@@ -378,7 +378,7 @@
         })
         .catch(error => {
           console.error('Error fetching stats:', error);
-          updateStats(videoList[currentVideoIndex].url); // Hiển thị cục bộ nếu lỗi
+          updateStats(videoList[currentVideoIndex].url);
         });
     }
 
@@ -414,7 +414,7 @@
       videoPlayer.playbackRate = 1;
       savePlaybackSpeed(1);
       speedButtons.forEach(button => button.classList.remove('active'));
-      fetchStats(); // Lấy số liệu cho video mới
+      fetchStats();
       const playPromise = videoPlayer.play();
       if (playPromise !== undefined) {
         playPromise.catch(error => {
@@ -431,7 +431,7 @@
         return response.text();
       })
       .then(data => {
-        console.log('CSV data received:', data.substring(0, 100) + '...'); // Log first 100 chars
+        console.log('CSV data received:', data.substring(0, 100) + '...');
         videoList = parseCSV(data);
         console.log('Video List after parsing:', videoList);
         loading.style.display = 'none';
@@ -442,6 +442,7 @@
             console.log('Adjusted index to 0 due to out of bounds');
           }
           playVideo(currentVideoIndex);
+          fetchStats(); // Call fetchStats after videoList is populated
         } else {
           console.error('No videos found in videoList');
           loading.textContent = 'Không tìm thấy video trong danh sách';
@@ -487,10 +488,6 @@
         prevVideo();
       }
     });
-
-    // Lấy số liệu khi tải trang
-    console.log('Fetching stats on page load');
-    fetchStats();
   </script>
 </body>
 </html>
